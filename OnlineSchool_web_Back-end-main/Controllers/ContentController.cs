@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -244,7 +244,8 @@ namespace OnlineSchool_Back_end.Controllers
                     throw new Exception();
 
 
-                Content.AssetID = DirectUploadRecord.upload_id;
+                Content.UploadID = DirectUploadRecord.upload_id;  // real AssetID comes later via webhook
+                Content.AssetID = "";                              // cleared — set by MUX webhook once asset is ready
                 Content.AssetStatus = "Uploading";
 
                 Content.Save();//TODO : MAKE AN ASYNC VERSION OF ALL THE SAVE FUNCTIONS
