@@ -1,12 +1,8 @@
-﻿using System.Security.Cryptography;
-using System.Security.Cryptography.Xml;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OnlineSchoolBusniss;
-using Stripe;
 
 namespace OnlineSchool_Back_end.Controllers
 {
@@ -16,45 +12,45 @@ namespace OnlineSchool_Back_end.Controllers
     [ApiController]
     public class MuxWebhookController : ControllerBase
     {
-
-
         private readonly MUXEventService _muxEventService;
+        private readonly ILogger<MuxWebhookController> _logger;
 
-        public MuxWebhookController(MUXEventService MuxEventService)
+        public MuxWebhookController(MUXEventService MuxEventService,
+                                    ILogger<MuxWebhookController> logger)
         {
             _muxEventService = MuxEventService;
+            _logger          = logger;
         }
 
 
+        // ─── POST api/MuxWebhook ──────────────────────────────────────────────
 
-
-        [HttpPost()]
+        [HttpPost]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-
         public async Task<IActionResult> muxWebHook()
         {
-
             var body = HttpContext.Items["RawBody"] as string;
 
-            if (string.IsNullOrEmpty(body)) return BadRequest();
-
-            //Handle the events
-            if (!await _muxEventService.HandleMuxEvents(body))
+            if (string.IsNullOrEmpty(body))
             {
+                _logger.LogWarning("MuxWebhook — empty or missing RawBody");
+                return BadRequest();
+            }
+
+            _logger.LogInformation("MuxWebhook received | BodyLength={BodyLength}", body.Length);
+
+            bool handled = await _muxEventService.HandleMuxEvents(body);
+
+            if (!handled)
+            {
+                _logger.LogError("MuxWebhook — event handler returned false (processing failed)");
                 return StatusCode(500);
             }
-            else
-            {
-                return Ok();
-            }
+
+            _logger.LogInformation("MuxWebhook — event handled successfully");
+            return Ok();
         }
-
-
-
-
-
-
     }
 }

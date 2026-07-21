@@ -245,6 +245,7 @@ app.Use(async (context, next) =>
 });
 
 
+app.UseMiddleware<RequestLoggingMiddleware>();  // ← logs every request/response
 app.UseMiddleware<muxTraficValidatorMiddleware>();
 
 //app.UseHttpsRedirection();
