@@ -1,0 +1,51 @@
+# ── Build output ──────────────────────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# ── Visual Studio ──────────────────────────────────────────────────────────────
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+.vscode/
+
+# ── NuGet ─────────────────────────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+project.lock.json
+packages/
+!**/packages/build/
+
+# ── Rider ─────────────────────────────────────────────────────────────────────
+.idea/
+*.sln.iml
+
+# ── Secrets & environment ─────────────────────────────────────────────────────
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+*.pfx
+*.p12
+secrets.json
+
+# ── Publish artifacts ─────────────────────────────────────────────────────────
+publish/
+[Pp]ublish/
+
+# ── Test results ──────────────────────────────────────────────────────────────
+TestResults/
+*.trx
+*.coveragexml
+coverage/
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Frontend subfolder (has its own repo) ─────────────────────────────────────
+schoolnet-FE/

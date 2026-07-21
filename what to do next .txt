@@ -1,0 +1,21 @@
+
+
+ToDo :
+    subscribe btn should only be visible to student who are not subscribed done
+    edit btn should only appear to teacher of the course (with certain permissions ) done
+    add click event listener to the subscribe btn to send user to the payment page of stripe done
+    add at the last phase of teacher sign up redirect to stripe connected account configuration (will be added when we add account settings page)
+
+
+last :
+
+    make a screen record (cinematic one) where you 
+        sign up as teacher 
+            add course 
+            add content (speedup the video uploading time)
+        sign up as student
+            pay for the teacher course
+            watch the content 
+
+
+put the video on linkedin !!!
