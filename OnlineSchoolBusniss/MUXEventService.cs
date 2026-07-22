@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,10 +11,6 @@ namespace OnlineSchoolBusniss
     {
 
 
-
-
-
-
         //******************************************************************************************************************************************
         //*****************************************               MUX webhook Events              **************************************************
         //******************************************************************************************************************************************
@@ -22,7 +18,6 @@ namespace OnlineSchoolBusniss
         {
 
             var jsonPayload = JsonSerializer.Deserialize<JsonElement>(HttpBody);
-
 
             string CurrentEvent = jsonPayload.GetProperty("type").GetString();
 
@@ -32,206 +27,123 @@ namespace OnlineSchoolBusniss
 
                 try
                 {
-
                     return await HandleVideo_upload_asset_created_Event(jsonPayload.GetProperty("data"));
-
-
                 }
                 catch (Exception ex)
                 {
-
                     Console.WriteLine(ex.ToString());
                     return false;
-
                 }
-
-
-
 
             }
             else if (string.Compare(CurrentEvent, "video.asset.ready") == 0)
             {
                 //the video is ready to be streamed to student 
-                //maybe notify the student of the course that this video belongs to
-                //and notify the teacher of this course
-
-
-                //first we should access the body and get the playback id 
-                //and store it to db along side the video status
 
                 try
                 {
-
                     return await HandleVideo_asset_ready_Event(jsonPayload.GetProperty("data"));
-
-
                 }
                 catch (Exception ex)
                 {
-
                     Console.WriteLine(ex.ToString());
                     return false;
-
                 }
-
-
-
-
-
-
-
-
-
-
 
             }
 
-
-
-
-
             return false;
-
-
 
         }
 
 
+        /// <summary>
+        /// Fired by MUX when a direct upload finishes and MUX has created the asset internally.
+        /// At this point the asset is still "preparing" — not yet streamable.
+        ///
+        /// Payload shape (data object):
+        ///   data.id          → the MUX Upload ID  (same one we stored in CourseContent.UploadID)
+        ///   data.asset_id    → the real MUX Asset ID
+        ///   data.status      → "asset_created" (asset is preparing)
+        ///
+        /// We look up the content record by UploadID and store the real AssetID + status.
+        /// </summary>
         private async ValueTask<bool> HandleVideo_upload_asset_created_Event(JsonElement data)
         {
-            //the asset is created
-            //1) get the asset id and playback id and store them in db 
+            // The upload ID is data.id in the upload event payload
+            string uploadID = data.GetProperty("id").GetString() ?? "";
 
+            // The real MUX asset ID (will also appear in subsequent asset events)
+            string assetID = data.GetProperty("asset_id").GetString() ?? "";
 
+            // Status at this stage is typically "asset_created" (asset is preparing in MUX)
+            string assetStatus = data.GetProperty("status").GetString() ?? "";
 
-            //the id of our video in mux database , can be used to retrieve info , create playbacks ....
-            string AssetID = data.GetProperty("asset_id").GetString();
+            if (string.IsNullOrEmpty(uploadID)) return false;
 
-            //status can be : "preparing" "ready" "errored"
-            string AssetStatus = data.GetProperty("status").GetString();
-
-            //here we will find the data we added when we just created the direct upload 
-            var metaData = data.GetProperty("asset_settings").GetProperty("meta");
-
-
-
-
-            //now we will save the asset id and its status in db
-
-
-
-            clsCourseContent Content = clsCourseContent.Find(metaData.GetProperty("ContentID").GetInt32());
-            if (Content != null)
+            // Find our content record by the UploadID we stored when generating the upload URL
+            clsCourseContent Content = clsCourseContent.FindByUploadID(uploadID);
+            if (Content == null)
             {
-                //here we save the info in the content object 
-
-                Content.AssetID = AssetID;
-                Content.AssetStatus = AssetStatus;
-
-
-                //and save it to db
-                if (Content.Save())
-                {
-
-                    return true;
-
-                }
-
-
-
-            }
-
-            return false;
-
-
-
-
-
-
-        }
-      
-        
-        private async ValueTask<bool> HandleVideo_asset_ready_Event(JsonElement data)
-        {
-            //the asset is ready
-            //1) get the asset id and playback id and store them in db 
-
-
-
-            //the id of our video in mux database , can be used to retrieve info , create playbacks ....
-            string AssetID = data.GetProperty("id").GetString() ?? "";
-
-            //status can be : "preparing" "ready" "errored"
-            string AssetStatus = data.GetProperty("status").GetString() ?? "";
-
-            //here we will find the data we added when we just created the direct upload (contentid ...)
-
-            if (!data.TryGetProperty("metadata", out JsonElement metadata))
-            {
+                Console.WriteLine($"MUXEventService: no content record found for UploadID={uploadID}");
                 return false;
             }
 
+            // Store the real asset ID and current status
+            Content.AssetID = assetID;
+            Content.AssetStatus = assetStatus;
 
-
-            //playback ids with there policy
-            var playback_ids = data.GetProperty("playback_ids");
-
-
-
-
-            //now we will save the first playback ids in database
-
-
-
-            clsCourseContent Content = clsCourseContent.Find(metadata.GetProperty("ContentID").GetInt32());
-            if (Content != null)
-            {
-                //here we save the info in the content object 
-
-
-
-
-                Content.AssetID = AssetID;
-                Content.AssetStatus = AssetStatus;
-
-
-                if (playback_ids.ValueKind == JsonValueKind.Array && playback_ids.GetArrayLength() > 0)
-                {
-
-                    Content.PlayBackID = playback_ids[0].GetProperty("id").GetString() ?? "";
-
-
-                }
-
-
-
-
-
-
-                //and save it to db
-                if (Content.Save())
-                {
-
-                    return true;
-
-                }
-
-
-
-            }
-
-            return false;
-
-
-
-
-
-
+            return Content.Save();
         }
 
 
+        /// <summary>
+        /// Fired by MUX when the asset finishes processing and is ready for streaming.
+        ///
+        /// Payload shape (data object):
+        ///   data.upload_id      → the MUX Upload ID (same one we stored in CourseContent.UploadID)
+        ///   data.id             → the real MUX Asset ID
+        ///   data.status         → "ready"
+        ///   data.playback_ids   → array of playback objects with id + policy
+        ///
+        /// We look up by UploadID, then store AssetID, status, and the first PlaybackID.
+        /// </summary>
+        private async ValueTask<bool> HandleVideo_asset_ready_Event(JsonElement data)
+        {
+            // The upload_id field is present on video.asset.ready events
+            if (!data.TryGetProperty("upload_id", out JsonElement uploadIdElement))
+            {
+                Console.WriteLine("MUXEventService: video.asset.ready event has no upload_id — cannot correlate to content record.");
+                return false;
+            }
 
+            string uploadID   = uploadIdElement.GetString() ?? "";
+            string assetID    = data.GetProperty("id").GetString() ?? "";
+            string assetStatus = data.GetProperty("status").GetString() ?? "";
 
+            if (string.IsNullOrEmpty(uploadID)) return false;
+
+            // Find our content record by UploadID
+            clsCourseContent Content = clsCourseContent.FindByUploadID(uploadID);
+            if (Content == null)
+            {
+                Console.WriteLine($"MUXEventService: no content record found for UploadID={uploadID}");
+                return false;
+            }
+
+            Content.AssetID    = assetID;
+            Content.AssetStatus = assetStatus;
+
+            // Store the first available playback ID
+            if (data.TryGetProperty("playback_ids", out JsonElement playbackIds)
+                && playbackIds.ValueKind == JsonValueKind.Array
+                && playbackIds.GetArrayLength() > 0)
+            {
+                Content.PlayBackID = playbackIds[0].GetProperty("id").GetString() ?? "";
+            }
+
+            return Content.Save();
+        }
 
 
     }

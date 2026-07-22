@@ -194,7 +194,8 @@ namespace OnlineSchool_Back_end.Controllers
                 if (DirectUploadRecord == null)
                     throw new Exception("MUX CreateAsset returned null");
 
-                Content.AssetID = DirectUploadRecord.upload_id;
+                Content.UploadID = DirectUploadRecord.upload_id;  // real AssetID comes later via webhook
+                Content.AssetID = "";                              // cleared — set by MUX webhook once asset is ready
                 Content.AssetStatus = "Uploading";
 
                 Content.Save();
