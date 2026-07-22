@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -198,7 +198,7 @@ namespace OnlineSchool_Back_end.Controllers
             
             if (Content.Save())
             {
-                return CreatedAtRoute("GetDirectUploadUrl", new { id = Content.CourseContentID }, Content.Content_DTO);
+                return CreatedAtRoute("GetDirectUploadUrl", new { ContentID = Content.CourseContentID }, Content.Content_DTO);
             }
             else
             {
