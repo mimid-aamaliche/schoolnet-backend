@@ -155,7 +155,7 @@ namespace OnlineSchool_Back_end.Controllers
             {
                 _logger.LogInformation("AddNewContent succeeded | ContentID={ContentID} CourseID={CourseID}",
                     Content.CourseContentID, request.CourseID);
-                return CreatedAtRoute("GetDirectUploadUrl", new { id = Content.CourseContentID }, Content.Content_DTO);
+                return CreatedAtRoute("GetDirectUploadUrl", new { ContentID = Content.CourseContentID }, Content.Content_DTO);
             }
 
             _logger.LogError("AddNewContent failed — DB save error | Title={Title} CourseID={CourseID}", request.ContentTitle, request.CourseID);
