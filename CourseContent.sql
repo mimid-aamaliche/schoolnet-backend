@@ -22,9 +22,13 @@ Create Table CourseContent
 );
 GO
 
--- ── If the table already exists, just add the column ──────────────────────────
--- ALTER TABLE CourseContent ADD UploadID nvarchar(200) NULL;
--- GO
+-- ── Ensure UploadID column exists if table was created previously ─────────────
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'CourseContent')
+   AND NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CourseContent' AND COLUMN_NAME = 'UploadID')
+BEGIN
+    ALTER TABLE CourseContent ADD UploadID nvarchar(200) NULL;
+END
+GO
 
 
 ---------------------------------------------------------------------
