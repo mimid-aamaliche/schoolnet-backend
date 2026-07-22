@@ -24,8 +24,11 @@ namespace OnlineSchool_Back_end.Controllers
 
 
         // ─── POST api/MuxWebhook ──────────────────────────────────────────────
+        // Supports /api/MuxWebhook, /api/MuxWebhook/mux/webhook, /api/MuxWebhook/webhook
 
         [HttpPost]
+        [HttpPost("mux/webhook")]
+        [HttpPost("webhook")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]

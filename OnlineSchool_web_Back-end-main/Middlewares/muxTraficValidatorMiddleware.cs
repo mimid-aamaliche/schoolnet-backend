@@ -28,12 +28,12 @@ public class muxTraficValidatorMiddleware
         
         Console.WriteLine(context.Request.Path);
 
-        //check if the request is headed for the mux webhook  
-        if (string.Compare(context.Request.Path, "/api/MuxWebhook") != 0)
+        // check if the request is headed for the mux webhook  
+        if (context.Request.Path.Value == null ||
+           !context.Request.Path.Value.StartsWith("/api/MuxWebhook", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);
             return;
-
         }
 
 
