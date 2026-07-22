@@ -1,173 +1,101 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using Azure;
-using Microsoft.IdentityModel.Tokens;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using SharedDTOs;
-
-
 
 namespace OnlineSchoolBusniss
 {
     public class clsMUXVideoService
     {
         private readonly HttpClient _httpclient;
+        private readonly ILogger<clsMUXVideoService>? _logger;
 
-        public clsMUXVideoService(HttpClient httpClient)
+        public clsMUXVideoService(HttpClient httpClient, ILogger<clsMUXVideoService>? logger = null)
         {
-
             _httpclient = httpClient;
+            _logger     = logger;
         }
 
         public async Task<DirectUploadRecord?> CreateAsset()
         {
+            _logger?.LogInformation("Creating MUX Direct Upload Asset via video/v1/uploads...");
 
-            // make the http body
             var body = new
             {
                 cors_origin = "*",
                 new_asset_settings = new
                 {
                     playback_policies = new List<string>
-                                {
-                                    "signed"
-                                },
-                    resumable = true
-
+                    {
+                        "signed"
+                    }
                 }
-
-
             };
 
-            //convert body to json format
-            string json = System.Text.Json.JsonSerializer.Serialize(body);
+            string json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+            HttpResponseMessage response = await _httpclient.PostAsync("video/v1/uploads", content);
 
+            string responseString = await response.Content.ReadAsStringAsync();
 
-
-            //send request
-            HttpResponseMessage responce = await _httpclient.PostAsync("video/v1/uploads", content);
-
-
-
-            if (responce.IsSuccessStatusCode)
+            if (response.IsSuccessStatusCode)
             {
-                //read the responce data that we want !!!!!
-                using (var document = JsonDocument.Parse(await responce.Content.ReadAsStringAsync()))
-                {
-                    var rootElement = document.RootElement;
+                using var document = JsonDocument.Parse(responseString);
+                var data = document.RootElement.GetProperty("data");
 
-                    //here we should extract the upload id and store it as asset id
-                    //and when the asset created event arrives , we match our record with mux record using that uploadid 
+                string? uploadUrl = data.GetProperty("url").GetString();
+                string? uploadId  = data.GetProperty("id").GetString();
 
-
-                    //here we should return the direct upload record wich will contain the upload_id and the url 
-
-                    var data=rootElement.GetProperty("data");
-                    string? upload_url= data.GetProperty("url").GetString();
-                    string? upload_id= data.GetProperty("id").GetString();
-
-                    return new DirectUploadRecord(upload_id,upload_url);
-
-                }
-
-
-
-
+                _logger?.LogInformation("MUX Direct Upload created successfully | UploadID={UploadID}", uploadId);
+                return new DirectUploadRecord(uploadId, uploadUrl);
             }
 
-
-
-
-
+            _logger?.LogError("MUX CreateAsset failed | StatusCode={StatusCode} Error={Response}",
+                response.StatusCode, responseString);
 
             return null;
         }
 
-        
         public async Task<string?> GetAssetPlayBackID(string AssetID)
         {
+            _logger?.LogInformation("Fetching MUX PlaybackID for AssetID={AssetID}...", AssetID);
 
+            HttpResponseMessage response = await _httpclient.GetAsync($"video/v1/assets/{AssetID}");
+            string responseString = await response.Content.ReadAsStringAsync();
 
-
-
-            //send request
-            HttpResponseMessage responce = await _httpclient.GetAsync($"video/v1/assets/{AssetID}");
-
-
-            if (responce.IsSuccessStatusCode)
+            if (response.IsSuccessStatusCode)
             {
-                //read the responce data that we want !!!!!
+                using var document = JsonDocument.Parse(responseString);
+                var rootElement = document.RootElement;
 
+                JsonElement playbackIDS = rootElement.GetProperty("data").GetProperty("playback_ids");
 
-                using (var document = JsonDocument.Parse(await responce.Content.ReadAsStringAsync()))
+                if (playbackIDS.ValueKind == JsonValueKind.Array && playbackIDS.GetArrayLength() > 0)
                 {
-                    var rootElement = document.RootElement;
-
-
-
-                    JsonElement playbackIDS = rootElement.GetProperty("data").GetProperty("playback_ids");
-
-                    if (playbackIDS.ValueKind == JsonValueKind.Array && playbackIDS.GetArrayLength() > 0)
-                    {
-                        //here we return the first element
-                        return playbackIDS[0].GetProperty("id").GetString();
-
-
-                    }
-                    else
-                    {
-                        //here we return null , meaning the user needs to creat a playback befor watching the content
-                        return null;
-
-
-                    }
-
-
-
+                    string? playbackId = playbackIDS[0].GetProperty("id").GetString();
+                    _logger?.LogInformation("Found PlaybackID={PlaybackID} for AssetID={AssetID}", playbackId, AssetID);
+                    return playbackId;
                 }
 
-
-
-            }
-            else
-            {
+                _logger?.LogInformation("No playback IDs found on asset yet | AssetID={AssetID}", AssetID);
                 return null;
             }
 
+            _logger?.LogError("GetAssetPlayBackID failed | AssetID={AssetID} StatusCode={StatusCode} Error={Response}",
+                AssetID, response.StatusCode, responseString);
 
-
-
-
-
-
-
+            return null;
         }
-
 
         public async Task<string?> CreateAssetPlayBackID(string AssetID)
         {
-
-
-
+            _logger?.LogInformation("CreateAssetPlayBackID requested for AssetID={AssetID}", AssetID);
             return "the new playback id ";
-
-
-
-
-
-
-
         }
-
-
-
-
-
-
-
     }
 }

@@ -82,11 +82,10 @@ builder.Services.AddScoped<HomePageService>();
 builder.Services.AddTransient<clsMUXVideoService>(sp =>
 {
     var Factory = sp.GetRequiredService<IHttpClientFactory>();
-
     var client = Factory.CreateClient("muxService");
+    var logger = sp.GetService<ILogger<clsMUXVideoService>>();
 
-    return new clsMUXVideoService(client);
-
+    return new clsMUXVideoService(client, logger);
 });
 
 
