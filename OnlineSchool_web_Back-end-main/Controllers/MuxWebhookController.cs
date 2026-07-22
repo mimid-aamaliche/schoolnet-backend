@@ -38,7 +38,15 @@ namespace OnlineSchool_Back_end.Controllers
 
             if (string.IsNullOrEmpty(body))
             {
-                _logger.LogWarning("MuxWebhook — empty or missing RawBody");
+                HttpContext.Request.EnableBuffering();
+                using var reader = new StreamReader(HttpContext.Request.Body, System.Text.Encoding.UTF8, leaveOpen: true);
+                body = await reader.ReadToEndAsync();
+                HttpContext.Request.Body.Position = 0;
+            }
+
+            if (string.IsNullOrEmpty(body))
+            {
+                _logger.LogWarning("MuxWebhook — empty or missing request body");
                 return BadRequest();
             }
 
