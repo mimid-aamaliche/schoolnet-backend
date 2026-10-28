@@ -37,7 +37,7 @@ namespace OnlineSchool_Back_end.Controllers
                 var stripeEvent = EventUtility.ConstructEvent(
                     json,
                     Request.Headers["Stripe-Signature"],
-                    "whsec_rtiEuejmiyn4Y6HwWWTZsiqSV5YduWmu"
+                    _webhookKey
                 );
 
                 _logger.LogInformation("Stripe webhook received | EventType={EventType} EventID={EventID}",
