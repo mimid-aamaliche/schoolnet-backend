@@ -1,5 +1,4 @@
 
-
 use schoolNet
 
 
@@ -15,11 +14,20 @@ Create Table CourseContent
     ContentPath nvarchar(200) null,
     PlayBackID nvarchar(200) null,
     AssetID nvarchar(200) null,
-    Status nvarchar(50) null,
+    UploadID nvarchar(200) null,        -- MUX direct upload ID (stored when upload URL is generated)
+    Status nvarchar(50) null,           -- 'Uploading' | 'preparing' | 'ready' | 'errored'
 
     CONSTRAINT FK_Content_Course FOREIGN KEY(CourseID) REFERENCES Course(id)
 
 );
+GO
+
+-- ── Ensure UploadID column exists if table was created previously ─────────────
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'CourseContent')
+   AND NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'CourseContent' AND COLUMN_NAME = 'UploadID')
+BEGIN
+    ALTER TABLE CourseContent ADD UploadID nvarchar(200) NULL;
+END
 GO
 
 
@@ -27,40 +35,36 @@ GO
 ---------> Add New 
 ---------------------------------------------------------------------
 
-Create procedure SP_AddNew_CourseContent
+CREATE OR ALTER PROCEDURE SP_AddNew_CourseContent
     @Title nvarchar(300),
-    @ContentType nvarchar(50) ,
+    @ContentType nvarchar(50),
     @DateOfRealease DATETIME,
-    @Description nvarchar(MAX) ,
-    @Notes nvarchar(MAX) ,
+    @Description nvarchar(MAX),
+    @Notes nvarchar(MAX),
     @CourseID integer,
-    @ContentPath nvarchar(200) ,
-    @PlayBackID nvarchar(200) ,
-    @AssetID nvarchar(200) ,
-    @Status nvarchar(50) ,
+    @ContentPath nvarchar(200),
+    @PlayBackID nvarchar(200),
+    @AssetID nvarchar(200),
+    @UploadID nvarchar(200),
+    @Status nvarchar(50),
     @InsertedID int output
-as
+AS
 BEGIN
-SET NOCOUNT ON;
-    Begin TRY
-            INSERT INTO CourseContent
-        (Title,ContentType,DateOfRealease,Description,Notes,CourseID,ContentPath,PlayBackID,AssetID,Status)
+    SET NOCOUNT ON;
+    BEGIN TRY
+        INSERT INTO CourseContent
+            (Title, ContentType, DateOfRealease, Description, Notes, CourseID, ContentPath, PlayBackID, AssetID, UploadID, Status)
         VALUES
-        (@Title, @ContentType, @DateOfRealease, @Description, @Notes, @CourseID, @ContentPath, @PlayBackID, @AssetID, @Status);
-            SET @InsertedID = SCOPE_IDENTITY();
+            (@Title, @ContentType, @DateOfRealease, @Description, @Notes, @CourseID, @ContentPath, @PlayBackID, @AssetID, @UploadID, @Status);
+        SET @InsertedID = SCOPE_IDENTITY();
     END TRY
-
     BEGIN CATCH
-            PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
-            PRINT 'Error Message: ' + ERROR_MESSAGE();
-            SET @InsertedID = NULL;
+        PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+        SET @InsertedID = NULL;
     END CATCH
-
 END
 GO
-
-
-
 
 
 
@@ -69,66 +73,57 @@ GO
 ---------> Update 
 ---------------------------------------------------------------------
 
-
-Create procedure SP_Update_CourseContent
-    @ContentID int ,
+CREATE OR ALTER PROCEDURE SP_Update_CourseContent
+    @ContentID int,
     @Title nvarchar(300),
-    @ContentType nvarchar(50) ,
+    @ContentType nvarchar(50),
     @DateOfRealease DATETIME,
-    @Description nvarchar(MAX) ,
-    @Notes nvarchar(MAX) ,
+    @Description nvarchar(MAX),
+    @Notes nvarchar(MAX),
     @CourseID integer,
-    @ContentPath nvarchar(200) ,
-    @PlayBackID nvarchar(200) ,
-    @AssetID nvarchar(200) ,
-    @Status nvarchar(50) ,
-    @InsertedID int output
-as
+    @ContentPath nvarchar(200),
+    @PlayBackID nvarchar(200),
+    @AssetID nvarchar(200),
+    @UploadID nvarchar(200),
+    @Status nvarchar(50)
+AS
 BEGIN
-SET NOCOUNT ON;
-    Begin TRY
-            
-           
-                UPDATE CourseContent
-                SET         Title=@Title,
-                            ContentType=@ContentType,
-                            DateOfRealease=@DateOfRealease,
-                            Description=@Description,
-                            Notes=@Notes,
-                            CourseID=@CourseID,
-                            ContentPath=@ContentPath,
-                            PlayBackID=@PlayBackID,
-                            AssetID=@AssetID,
-                            Status=@Status
-                WHERE id=@ContentID;
-            if @@ROWCOUNT = 0
-                return -1;
-            ELSE
-                return 1;
-             
+    SET NOCOUNT ON;
+    BEGIN TRY
+        UPDATE CourseContent
+        SET Title         = @Title,
+            ContentType   = @ContentType,
+            DateOfRealease= @DateOfRealease,
+            Description   = @Description,
+            Notes         = @Notes,
+            CourseID      = @CourseID,
+            ContentPath   = @ContentPath,
+            PlayBackID    = @PlayBackID,
+            AssetID       = @AssetID,
+            UploadID      = @UploadID,
+            Status        = @Status
+        WHERE id = @ContentID;
 
-
-        END TRY
-
-        BEGIN CATCH
-            PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
-            PRINT 'Error Message: ' + ERROR_MESSAGE();
-            RETURN ERROR_NUMBER();
-        END CATCH
-
+        IF @@ROWCOUNT = 0
+            RETURN -1;
+        ELSE
+            RETURN 1;
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+        RETURN ERROR_NUMBER();
+    END CATCH
 END
 GO
-
 
 
 ---------------------------------------------------------------------
 ---------> Find By ID 
 ---------------------------------------------------------------------
 
-
-
-create procedure SP_FindByID_CourseContent
-    @ContentID int ,
+CREATE OR ALTER PROCEDURE SP_FindByID_CourseContent
+    @ContentID int,
     @Title nvarchar(300) output,
     @ContentType nvarchar(50) output,
     @DateOfRealease DATETIME output,
@@ -137,81 +132,106 @@ create procedure SP_FindByID_CourseContent
     @CourseID integer output,
     @ContentPath nvarchar(200) output,
     @PlayBackID nvarchar(200) output,
-    @AssetID nvarchar(200) output ,
+    @AssetID nvarchar(200) output,
+    @UploadID nvarchar(200) output,
     @Status nvarchar(50) output
-as
+AS
 BEGIN
-SET NOCOUNT ON;
-        Begin TRY
-            if EXISTS (select 1 from CourseContent where id=@ContentID)
-            BEGIN
-
-                select      @Title=Title,
-                            @ContentType=ContentType,
-                            @DateOfRealease=DateOfRealease,
-                            @Description=Description,
-                            @Notes=Notes,
-                            @CourseID=CourseID,
-                            @ContentPath=ContentPath,
-                            @PlayBackID=PlayBackID,
-                            @AssetID=AssetID,
-                            @Status=Status
-                from CourseContent
-                where id=@ContentID;
-                return 1;
-
-            END
-            ELSE
-                return 0;
-        END TRY
-
-        BEGIN CATCH
-            PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
-            PRINT 'Error Message: ' + ERROR_MESSAGE();
-            RETURN ERROR_NUMBER();
-        END CATCH
-
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF EXISTS (SELECT 1 FROM CourseContent WHERE id = @ContentID)
+        BEGIN
+            SELECT  @Title          = Title,
+                    @ContentType    = ContentType,
+                    @DateOfRealease = DateOfRealease,
+                    @Description    = Description,
+                    @Notes          = Notes,
+                    @CourseID       = CourseID,
+                    @ContentPath    = ContentPath,
+                    @PlayBackID     = PlayBackID,
+                    @AssetID        = AssetID,
+                    @UploadID       = UploadID,
+                    @Status         = Status
+            FROM CourseContent
+            WHERE id = @ContentID;
+            RETURN 1;
+        END
+        ELSE
+            RETURN 0;
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+        RETURN ERROR_NUMBER();
+    END CATCH
 END
 GO
 
 
+---------------------------------------------------------------------
+---------> Find By UploadID  (used by MUX webhook handlers)
+---------------------------------------------------------------------
 
-
-
-
-
+CREATE OR ALTER PROCEDURE SP_FindByUploadID_CourseContent
+    @UploadID nvarchar(200),
+    @ContentID int output,
+    @Title nvarchar(300) output,
+    @ContentType nvarchar(50) output,
+    @DateOfRealease DATETIME output,
+    @Description nvarchar(MAX) output,
+    @Notes nvarchar(MAX) output,
+    @CourseID integer output,
+    @ContentPath nvarchar(200) output,
+    @PlayBackID nvarchar(200) output,
+    @AssetID nvarchar(200) output,
+    @Status nvarchar(50) output
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF EXISTS (SELECT 1 FROM CourseContent WHERE UploadID = @UploadID)
+        BEGIN
+            SELECT  @ContentID      = id,
+                    @Title          = Title,
+                    @ContentType    = ContentType,
+                    @DateOfRealease = DateOfRealease,
+                    @Description    = Description,
+                    @Notes          = Notes,
+                    @CourseID       = CourseID,
+                    @ContentPath    = ContentPath,
+                    @PlayBackID     = PlayBackID,
+                    @AssetID        = AssetID,
+                    @Status         = Status
+            FROM CourseContent
+            WHERE UploadID = @UploadID;
+            RETURN 1;
+        END
+        ELSE
+            RETURN 0;
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+        RETURN ERROR_NUMBER();
+    END CATCH
+END
+GO
 
 
 ---------------------------------------------------------------------
 ---------> Get Course X Content
 ---------------------------------------------------------------------
 
---note here we might use the pagination 
---and we should return only the Assets that are preparing
-
-
-
-create PROCEDURE SP_GetContentOfCourse_CourseContent
-    @CourseID int 
-    AS
-    BEGIN
-        BEGIN TRY
-            SELECT * FROM CourseContent where CourseID=@CourseID;
-        END TRY
-        BEGIN CATCH
-             PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
-            PRINT 'Error Message: ' + ERROR_MESSAGE();
-        END CATCH
-        
-
-    END
-
-
-
-
-
-
----------------------------------------------------------------------
----------> 
----------------------------------------------------------------------
-
+CREATE OR ALTER PROCEDURE SP_GetContentOfCourse_CourseContent
+    @CourseID int
+AS
+BEGIN
+    BEGIN TRY
+        SELECT * FROM CourseContent WHERE CourseID = @CourseID;
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+    END CATCH
+END
+GO

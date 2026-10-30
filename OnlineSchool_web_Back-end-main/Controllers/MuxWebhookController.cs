@@ -1,12 +1,8 @@
-﻿using System.Security.Cryptography;
-using System.Security.Cryptography.Xml;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OnlineSchoolBusniss;
-using Stripe;
 
 namespace OnlineSchool_Back_end.Controllers
 {
@@ -16,45 +12,56 @@ namespace OnlineSchool_Back_end.Controllers
     [ApiController]
     public class MuxWebhookController : ControllerBase
     {
-
-
         private readonly MUXEventService _muxEventService;
+        private readonly ILogger<MuxWebhookController> _logger;
 
-        public MuxWebhookController(MUXEventService MuxEventService)
+        public MuxWebhookController(MUXEventService MuxEventService,
+                                    ILogger<MuxWebhookController> logger)
         {
             _muxEventService = MuxEventService;
+            _logger          = logger;
         }
 
 
+        // ─── POST api/MuxWebhook ──────────────────────────────────────────────
+        // Supports /api/MuxWebhook, /api/MuxWebhook/mux/webhook, /api/MuxWebhook/webhook
 
-
-        [HttpPost()]
+        [HttpPost]
+        [HttpPost("mux/webhook")]
+        [HttpPost("webhook")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-
         public async Task<IActionResult> muxWebHook()
         {
-
             var body = HttpContext.Items["RawBody"] as string;
 
-            if (string.IsNullOrEmpty(body)) return BadRequest();
-
-            //Handle the events
-            if (!await _muxEventService.HandleMuxEvents(body))
+            if (string.IsNullOrEmpty(body))
             {
+                HttpContext.Request.EnableBuffering();
+                using var reader = new StreamReader(HttpContext.Request.Body, System.Text.Encoding.UTF8, leaveOpen: true);
+                body = await reader.ReadToEndAsync();
+                HttpContext.Request.Body.Position = 0;
+            }
+
+            if (string.IsNullOrEmpty(body))
+            {
+                _logger.LogWarning("MuxWebhook — empty or missing request body");
+                return BadRequest();
+            }
+
+            _logger.LogInformation("MuxWebhook received | BodyLength={BodyLength}", body.Length);
+
+            bool handled = await _muxEventService.HandleMuxEvents(body);
+
+            if (!handled)
+            {
+                _logger.LogError("MuxWebhook — event handler returned false (processing failed)");
                 return StatusCode(500);
             }
-            else
-            {
-                return Ok();
-            }
+
+            _logger.LogInformation("MuxWebhook — event handled successfully");
+            return Ok();
         }
-
-
-
-
-
-
     }
 }

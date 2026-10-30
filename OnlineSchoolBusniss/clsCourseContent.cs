@@ -1,4 +1,4 @@
-﻿using OnlineSchoolDataAccess;
+using OnlineSchoolDataAccess;
 using SharedDTOs;
 using System;
 using System.Collections.Generic;
@@ -27,9 +27,10 @@ namespace OnlineSchoolBusniss
 
 
 
-        //field for mux service
+        //fields for mux service
         public string PlayBackID { get; set; }
         public string AssetID { get; set; }
+        public string UploadID { get; set; }   // MUX direct-upload ID — stored when upload URL is generated
         public string AssetStatus { get; set; }
 
 
@@ -78,6 +79,7 @@ namespace OnlineSchoolBusniss
             CourseID = null;
             PlayBackID = "";
             AssetID = "";
+            UploadID = "";
             AssetStatus = "";
 
 
@@ -99,6 +101,7 @@ namespace OnlineSchoolBusniss
             CourseID = contentInfo.CourseID;
             PlayBackID = "";
             AssetID = "";
+            UploadID = "";
             AssetStatus = "";
 
 
@@ -112,7 +115,7 @@ namespace OnlineSchoolBusniss
 
         //Constructors used to update content
 
-        public clsCourseContent(int? courseContentID, string contentType, string contentPath, int? courseID, string contentTitle, string description, DateTime dateOfRealease, string notes, string playBackID, string assetID, string assetStatus)
+        public clsCourseContent(int? courseContentID, string contentType, string contentPath, int? courseID, string contentTitle, string description, DateTime dateOfRealease, string notes, string playBackID, string assetID, string uploadID, string assetStatus)
         {
             CourseContentID = courseContentID;
             ContentType = contentType;
@@ -124,6 +127,7 @@ namespace OnlineSchoolBusniss
             Notes = notes;
             PlayBackID = playBackID;
             AssetID = assetID;
+            UploadID = uploadID;
             AssetStatus = assetStatus;
             CurrentMode = enMode.enUpdateMode;
 
@@ -131,9 +135,9 @@ namespace OnlineSchoolBusniss
 
         private bool _AddNewCourseContent()
         {
-            this.CourseContentID = clsSqlCourseContentData.AddNewCourseContent(ContentTitle, Description,ContentType,
-                                                                ContentPath,CourseID,Notes,DateOfRealease
-                                                                , PlayBackID, AssetID, AssetStatus);
+            this.CourseContentID = clsSqlCourseContentData.AddNewCourseContent(ContentTitle, Description, ContentType,
+                                                                ContentPath, CourseID, Notes, DateOfRealease,
+                                                                PlayBackID, AssetID, UploadID, AssetStatus);
 
             return CourseContentID != null;
 
@@ -141,10 +145,10 @@ namespace OnlineSchoolBusniss
 
         private bool _UpDateCourseContent()
         {
-           return  clsSqlCourseContentData.UpDateCourseContent(CourseContentID,ContentTitle,
+            return clsSqlCourseContentData.UpDateCourseContent(CourseContentID, ContentTitle,
                                   Description, ContentType,
-                                  ContentPath, CourseID, Notes, DateOfRealease
-                                  , PlayBackID, AssetID, AssetStatus);
+                                  ContentPath, CourseID, Notes, DateOfRealease,
+                                  PlayBackID, AssetID, UploadID, AssetStatus);
 
 
         }
@@ -163,25 +167,44 @@ namespace OnlineSchoolBusniss
 
         public static clsCourseContent Find(int? contentID)
         {
-            string desc = "", notes = "", contentpath = "", type = "", title = "",playbackid="",assetid="",status="";
+            string desc = "", notes = "", contentpath = "", type = "", title = "", playbackid = "", assetid = "", uploadid = "", status = "";
             DateTime releasedate = DateTime.MinValue;
             int? courseid = null;
             if (clsSqlCourseContentData.FindCourseContentByID(contentID, ref title, ref desc, ref type, ref contentpath,
-                ref courseid, ref notes, ref releasedate,ref playbackid,ref assetid,ref status))
+                ref courseid, ref notes, ref releasedate, ref playbackid, ref assetid, ref uploadid, ref status))
             {
-
-                return new clsCourseContent(contentID,type,contentpath,courseid,title, desc, releasedate,notes, playbackid, assetid, status);
-
+                return new clsCourseContent(contentID, type, contentpath, courseid, title, desc, releasedate, notes, playbackid, assetid, uploadid, status);
             }
             else
             {
                 return null;
             }
+        }
 
 
+        /// <summary>
+        /// Look up a content record by its MUX UploadID.
+        /// Used by webhook handlers to find the record without relying on MUX metadata.
+        /// </summary>
+        public static clsCourseContent FindByUploadID(string uploadID)
+        {
+            if (string.IsNullOrEmpty(uploadID)) return null;
 
+            int? contentid = null;
+            string desc = "", notes = "", contentpath = "", type = "", title = "", playbackid = "", assetid = "", status = "";
+            DateTime releasedate = DateTime.MinValue;
+            int? courseid = null;
 
-
+            if (clsSqlCourseContentData.FindByUploadID(uploadID, ref contentid, ref title, ref desc, ref type,
+                ref contentpath, ref courseid, ref notes, ref releasedate, ref playbackid, ref assetid, ref status))
+            {
+                // Note: UploadID is passed as-is since we searched by it
+                return new clsCourseContent(contentid, type, contentpath, courseid, title, desc, releasedate, notes, playbackid, assetid, uploadID, status);
+            }
+            else
+            {
+                return null;
+            }
         }
 
 

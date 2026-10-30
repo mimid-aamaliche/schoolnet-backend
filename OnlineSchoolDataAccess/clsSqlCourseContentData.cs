@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
@@ -15,7 +15,7 @@ namespace OnlineSchoolDataAccess
 
 
         public static int? AddNewCourseContent(string ContentTitle, string Description, string ContentType, string ContentPath,
-            int? CourseID,string Notes,DateTime DateOfRealease, string PlayBackID, string AssetID, string Status)
+            int? CourseID, string Notes, DateTime DateOfRealease, string PlayBackID, string AssetID, string UploadID, string Status)
         {
 
             int? Insertedid = null;
@@ -79,12 +79,19 @@ namespace OnlineSchoolDataAccess
                             command.Parameters.AddWithValue("@AssetID", DBNull.Value);
 
 
+                        if (UploadID != "")
+                            command.Parameters.AddWithValue("@UploadID", UploadID);
+                        else
+                            command.Parameters.AddWithValue("@UploadID", DBNull.Value);
+
+
                         if (Status != "")
                             command.Parameters.AddWithValue("@Status", Status);
                         else
                             command.Parameters.AddWithValue("@Status", DBNull.Value);
 
                         //-*************************************************************************
+
 
 
 
@@ -136,8 +143,8 @@ namespace OnlineSchoolDataAccess
 
         
 
-        public static async  Task<int?> AddNewCourseContentAsync(string ContentTitle, string Description, string ContentType, string ContentPath,
-            int? CourseID,string Notes,DateTime DateOfRealease, string PlayBackID, string AssetID, string Status)
+        public static async Task<int?> AddNewCourseContentAsync(string ContentTitle, string Description, string ContentType, string ContentPath,
+            int? CourseID, string Notes, DateTime DateOfRealease, string PlayBackID, string AssetID, string UploadID, string Status)
         {
 
             int? Insertedid = null;
@@ -199,6 +206,12 @@ namespace OnlineSchoolDataAccess
                             command.Parameters.AddWithValue("@AssetID", AssetID);
                         else
                             command.Parameters.AddWithValue("@AssetID", DBNull.Value);
+
+
+                        if (UploadID != "")
+                            command.Parameters.AddWithValue("@UploadID", UploadID);
+                        else
+                            command.Parameters.AddWithValue("@UploadID", DBNull.Value);
 
 
                         if (Status != "")
@@ -264,7 +277,7 @@ namespace OnlineSchoolDataAccess
         public static bool UpDateCourseContent(int? CourseContentID, string ContentTitle, string Description,
                                      string ContentType, string ContentPath,
                                  int? CourseID, string Notes, DateTime DateOfRealease
-                                 , string PlayBackID, string AssetID, string Status)
+                                 , string PlayBackID, string AssetID, string UploadID, string Status)
         {
             if (!CourseContentID.HasValue) { return false; }
 
@@ -408,7 +421,7 @@ namespace OnlineSchoolDataAccess
         public static async Task<bool> UpDateCourseContentAsync(int? CourseContentID, string ContentTitle, string Description,
                                      string ContentType, string ContentPath,
                                  int? CourseID, string Notes, DateTime DateOfRealease
-                                 , string PlayBackID, string AssetID, string Status)
+                                 , string PlayBackID, string AssetID, string UploadID, string Status)
         {
             if (!CourseContentID.HasValue) { return false; }
 
@@ -560,9 +573,9 @@ namespace OnlineSchoolDataAccess
 
 
 
-        public static bool FindCourseContentByID(int? CourseContentID,ref string ContentTitle,ref string Description,
-                                     ref string ContentType,ref string ContentPath,
-                                ref int? CourseID,ref string Notes,ref DateTime DateOfRealease, ref string PlayBackID, ref string AssetID, ref string Status)
+        public static bool FindCourseContentByID(int? CourseContentID, ref string ContentTitle, ref string Description,
+                                     ref string ContentType, ref string ContentPath,
+                                ref int? CourseID, ref string Notes, ref DateTime DateOfRealease, ref string PlayBackID, ref string AssetID, ref string UploadID, ref string Status)
         {
 
 
@@ -590,6 +603,7 @@ namespace OnlineSchoolDataAccess
                         command.Parameters.Add(new SqlParameter("@ContentPath", SqlDbType.NVarChar, 500) { Direction = ParameterDirection.Output });
                         command.Parameters.Add(new SqlParameter("@PlayBackID", SqlDbType.NVarChar, 255) { Direction = ParameterDirection.Output });
                         command.Parameters.Add(new SqlParameter("@AssetID", SqlDbType.NVarChar, 255) { Direction = ParameterDirection.Output });
+                        command.Parameters.Add(new SqlParameter("@UploadID", SqlDbType.NVarChar, 200) { Direction = ParameterDirection.Output });
                         command.Parameters.Add(new SqlParameter("@Status", SqlDbType.NVarChar, 30) { Direction = ParameterDirection.Output });
 
 
@@ -623,6 +637,7 @@ namespace OnlineSchoolDataAccess
 
                             PlayBackID = command.Parameters["@PlayBackID"].Value == DBNull.Value ? "" : (string)command.Parameters["@PlayBackID"].Value;
                             AssetID = command.Parameters["@AssetID"].Value == DBNull.Value ? "" : (string)command.Parameters["@AssetID"].Value;
+                            UploadID = command.Parameters["@UploadID"].Value == DBNull.Value ? "" : (string)command.Parameters["@UploadID"].Value;
                             Status = command.Parameters["@Status"].Value == DBNull.Value ? "" : (string)command.Parameters["@Status"].Value;
 
 
@@ -864,6 +879,76 @@ namespace OnlineSchoolDataAccess
 
 
 
+
+
+
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Find content record by MUX UploadID  (used in webhook handlers)
+        // ─────────────────────────────────────────────────────────────────────────
+
+        public static bool FindByUploadID(string uploadID, ref int? ContentID, ref string ContentTitle,
+            ref string Description, ref string ContentType, ref string ContentPath,
+            ref int? CourseID, ref string Notes, ref DateTime DateOfRealease,
+            ref string PlayBackID, ref string AssetID, ref string Status)
+        {
+            if (string.IsNullOrEmpty(uploadID)) return false;
+
+            bool IsFound = false;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(DataAccessConfiguration._connectionString))
+                using (SqlCommand command = new SqlCommand("SP_FindByUploadID_CourseContent", connection))
+                {
+                    command.CommandType = CommandType.StoredProcedure;
+
+                    command.Parameters.AddWithValue("@UploadID", uploadID);
+
+                    command.Parameters.Add(new SqlParameter("@ContentID",      SqlDbType.Int)          { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@Title",          SqlDbType.NVarChar, 300) { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@Description",    SqlDbType.NVarChar, -1)  { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@DateOfRealease", SqlDbType.DateTime)      { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@ContentType",    SqlDbType.NVarChar, 50)  { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@CourseID",       SqlDbType.Int)          { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@Notes",          SqlDbType.NVarChar, -1)  { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@ContentPath",    SqlDbType.NVarChar, 200) { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@PlayBackID",     SqlDbType.NVarChar, 200) { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@AssetID",        SqlDbType.NVarChar, 200) { Direction = ParameterDirection.Output });
+                    command.Parameters.Add(new SqlParameter("@Status",         SqlDbType.NVarChar, 50)  { Direction = ParameterDirection.Output });
+
+                    SqlParameter returnParameter = new SqlParameter("@ReturnVal", SqlDbType.Int)
+                        { Direction = ParameterDirection.ReturnValue };
+                    command.Parameters.Add(returnParameter);
+
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                    IsFound = (int)returnParameter.Value == 1;
+
+                    if (IsFound)
+                    {
+                        ContentID    = command.Parameters["@ContentID"].Value == DBNull.Value ? null : (int?)command.Parameters["@ContentID"].Value;
+                        ContentTitle = (string)command.Parameters["@Title"].Value;
+                        Description  = command.Parameters["@Description"].Value  == DBNull.Value ? "" : (string)command.Parameters["@Description"].Value;
+                        DateOfRealease = (DateTime)command.Parameters["@DateOfRealease"].Value;
+                        ContentType  = command.Parameters["@ContentType"].Value  == DBNull.Value ? "" : (string)command.Parameters["@ContentType"].Value;
+                        Notes        = command.Parameters["@Notes"].Value        == DBNull.Value ? "" : (string)command.Parameters["@Notes"].Value;
+                        ContentPath  = command.Parameters["@ContentPath"].Value  == DBNull.Value ? "" : (string)command.Parameters["@ContentPath"].Value;
+                        CourseID     = command.Parameters["@CourseID"].Value     == DBNull.Value ? null : (int?)command.Parameters["@CourseID"].Value;
+                        PlayBackID   = command.Parameters["@PlayBackID"].Value   == DBNull.Value ? "" : (string)command.Parameters["@PlayBackID"].Value;
+                        AssetID      = command.Parameters["@AssetID"].Value      == DBNull.Value ? "" : (string)command.Parameters["@AssetID"].Value;
+                        Status       = command.Parameters["@Status"].Value       == DBNull.Value ? "" : (string)command.Parameters["@Status"].Value;
+                    }
+
+                    connection.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                clsGlobal.Logger.Log(ex.Message, DateTime.Now);
+            }
+
+            return IsFound;
+        }
 
 
     }

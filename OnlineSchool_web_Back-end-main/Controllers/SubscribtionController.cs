@@ -1,13 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
-using Azure;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using OnlineSchool_Back_end.Services;
 using OnlineSchoolBusniss;
 using SharedDTOs;
-
 
 namespace OnlineSchool_Back_end.Controllers
 {
@@ -15,175 +11,116 @@ namespace OnlineSchool_Back_end.Controllers
     [ApiController]
     public class SubscribtionController : ControllerBase
     {
-
-
         private readonly clsStripeService _stripeService;
-
         private readonly IAuthService _authService;
+        private readonly ILogger<SubscribtionController> _logger;
 
-        public SubscribtionController(clsStripeService stripeService, IAuthService AuthService)
+        public SubscribtionController(clsStripeService stripeService,
+                                      IAuthService AuthService,
+                                      ILogger<SubscribtionController> logger)
         {
             _stripeService = stripeService;
-            _authService = AuthService;
-
+            _authService   = AuthService;
+            _logger        = logger;
         }
 
 
+        // ─── POST api/Subscribtion/UserHasAccess ──────────────────────────────
 
-
-
-
-
-
-
-
-
-
-        //User has access to course X endpoint
         [HttpPost("UserHasAccess", Name = "UserHasAccess")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<SubscribtionAuthResponceDTO>> UserHasAccess([FromBody][Required][Range(0, int.MaxValue)] int CourseID)
+        public async Task<ActionResult<SubscribtionAuthResponceDTO>> UserHasAccess(
+            [FromBody][Required][Range(0, int.MaxValue)] int CourseID)
         {
-
-            //Authorasation part ________________________________________________________________
             if (!_authService.UserIsAuthenticated())
             {
+                _logger.LogWarning("UserHasAccess — unauthenticated request | CourseID={CourseID}", CourseID);
                 return Unauthorized("User is not logged in this moment");
             }
-
 
             var UserMode = _authService.getRole();
             if (UserMode == null)
             {
+                _logger.LogWarning("UserHasAccess — missing role claim");
                 return Unauthorized("User Role Claim Not Found");
             }
 
-            int mode = UserMode == "student" ? 1 : 2;
-
-
             var UserId = _authService.GetUserID();
-            if (UserId == null)
+            if (UserId == null || !int.TryParse(UserId, out int id))
             {
-                return Unauthorized("User Id Claim Not Found");
-            }
-
-
-
-
-            if (!int.TryParse(UserId, out int id))
-            {
+                _logger.LogWarning("UserHasAccess — missing or invalid user ID claim");
                 return Unauthorized("User id  Format not valid");
-
             }
-            //____________________________________________________________________________________
 
+            int mode = UserMode == "student" ? 1 : 2;
+            _logger.LogInformation("UserHasAccess check | UserID={UserID} Role={Role} CourseID={CourseID}", id, UserMode, CourseID);
 
             var responce = new SubscribtionAuthResponceDTO();
 
             if (mode == (int)enMode.enStudentMode)
             {
-                //chack if the student has access to this course => he payed the fee subscribtion
-
                 responce.HasAccess = await clsSubscribtion.StudentHasAccessAsync(id, CourseID);
-
-                responce.message = "";
+                responce.message   = "";
+                _logger.LogInformation("UserHasAccess result | StudentID={StudentID} CourseID={CourseID} HasAccess={HasAccess}",
+                    id, CourseID, responce.HasAccess);
             }
             else
             {
-                //check if the teacher has access to this course => he is a handler with some permissions on this course
-
                 responce.HasAccess = false;
-                responce.message = "Teacher permissions on course not implimented fully yet";
+                responce.message   = "Teacher permissions on course not implimented fully yet";
+                _logger.LogWarning("UserHasAccess — teacher access check not yet implemented | TeacherID={TeacherID} CourseID={CourseID}",
+                    id, CourseID);
             }
 
             return Ok(responce);
         }
 
 
-
-
-
-
-
+        // ─── POST api/Subscribtion/Pay ────────────────────────────────────────
 
         [HttpPost("Pay", Name = "Pay")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<PaymentResponce>> Pay([FromBody][Required][Range(0, int.MaxValue)] int CourseID)
+        public async Task<ActionResult<PaymentResponce>> Pay(
+            [FromBody][Required][Range(0, int.MaxValue)] int CourseID)
         {
-
-
-            //Authorasation part ________________________________________________________________
             if (!_authService.UserIsAuthenticated())
             {
+                _logger.LogWarning("Pay — unauthenticated request | CourseID={CourseID}", CourseID);
                 return Unauthorized("User is not logged in this moment");
             }
-
 
             var UserMode = _authService.getRole();
             if (UserMode == null)
             {
+                _logger.LogWarning("Pay — missing role claim");
                 return Unauthorized("User Role Claim Not Found");
             }
 
-            int mode = UserMode == "student" ? 1 : 2;
-
-
             var UserId = _authService.GetUserID();
-            if (UserId == null)
+            if (UserId == null || !int.TryParse(UserId, out int id))
             {
-                return Unauthorized("User Id Claim Not Found");
-            }
-
-
-
-            if (!int.TryParse(UserId, out int id))
-            {
+                _logger.LogWarning("Pay — missing or invalid user ID claim");
                 return Unauthorized("User id  Format not valid");
             }
-            //____________________________________________________________________________________
 
-            Console.WriteLine($"course id {CourseID} , student id {id}");
+            _logger.LogInformation("Pay initiated | StudentID={StudentID} CourseID={CourseID}", id, CourseID);
 
-
-
-
-            //get product
-            clsCourse course = clsCourse.Find(CourseID);
-            //get customer
+            clsCourse  course  = clsCourse.Find(CourseID);
             clsStudent student = clsStudent.FindStudent(id);
-
-
 
             if (student == null || course == null)
             {
+                _logger.LogWarning("Pay — student or course not found | StudentID={StudentID} CourseID={CourseID} StudentFound={SF} CourseFound={CF}",
+                    id, CourseID, student != null, course != null);
                 return BadRequest();
             }
 
-
-            //logic
-
             var url = await _stripeService.Pay(course, student);
 
-
-            //return checkout session url
-
+            _logger.LogInformation("Pay — Stripe checkout session created | StudentID={StudentID} CourseID={CourseID}", id, CourseID);
             return Ok(new { checkout_url = url });
-
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
     }
 }
